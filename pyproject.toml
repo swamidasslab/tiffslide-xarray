@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "tiffslide_xarray"
+version = "0.0"
+description = "Xarray extension that uses xarray to lazy read 2D Tiff files."
+authors = ["S. Joshua Swamidass <swamidass@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+xarray = "^2023.9.0"
+xarray-datatree = "^0.0.12"
+tiffslide = "^2.2.0"
+
+[tool.poetry.group.dev.dependencies]
+
+[tool.poetry.plugins."xarray.backends"]
+"tiffslide" = "tiffslide_xarray:TiffBackendEntrypoint"
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "pep440"
+
+[tool.poetry-dynamic-versioning.substitution]
+folders = [{"path" = "tiffslide_xarray"}]
