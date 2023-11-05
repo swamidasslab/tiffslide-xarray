@@ -96,6 +96,7 @@ def _load_tiff_level(
             coords[d] = np.arange(s) * stride + offset
 
     x = TiffSlideArray(file_manager, level)
+    x = indexing.LazilyIndexedArray(x)
     x = xr.DataArray(
         x,
         dims=dims,
@@ -103,20 +104,24 @@ def _load_tiff_level(
         attrs=array_attrs,
     )
 
-    for c in dims:
-      if c in "xyz":
-        x[c].encoding["scale_factor"] = stride
-        x[c].encoding["add_offset"] = offset
-        x[c].encoding["compression"] = "lzf"
-        x[c].attrs["units"] = "px"
-        try:
-            x[c].attrs["mpp"] = x.attrs[f"tiffslide.mpp-{c.lower()}"]
-        except KeyError:
-            pass
-
     x.encoding = encoding
     x.encoding["_Unsigned"] = True
-    x.encoding["preferred_chunks"] = {k[0].lower(): v for k,v in x.encoding["preferred_chunks"].items()}
+    x.encoding["preferred_chunks"] = {
+        k[0].lower(): v for k, v in x.encoding["preferred_chunks"].items()
+    }
+    
+
+    for d in x.coords:
+        if d in set("xyz"):
+            x.coords[d].encoding["scale_factor"] = stride
+            x.coords[d].encoding["add_offset"] = offset
+            x.coords[d].encoding["compression"] = "lzf"
+
+            x.coords[d].attrs["units"] = "px"
+            try:
+                x.coords[d].attrs["mpp"] = dataset_attr[f"tiffslide.mpp-{d.lower()}"]
+            except KeyError:
+                pass
 
     x.attrs["level"] = level
 
@@ -131,7 +136,6 @@ def _load_tiff_level(
         x.attrs["mpp"] = x.attrs[f"tiffslide.mpp"]
     except KeyError:
         pass
-
 
     return x
 
@@ -193,7 +197,7 @@ class TiffSlideArray(BackendArray):
     def get_array(self) -> indexing.ExplicitlyIndexedNDArrayMixin:
         with self.file.acquire_context() as (zarr, slide):
             x: xr.DataArray = zarr[str(self.level)]  # type: ignore
-            return x._variable._data  # type: ignore
+            return x._variable._data.array.array  # type: ignore
 
     def __getitem__(self, key):
         return self.get_array()[key]

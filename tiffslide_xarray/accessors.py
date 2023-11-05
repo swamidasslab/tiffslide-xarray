@@ -9,17 +9,78 @@ We register two xarray accessors:
 
 import xarray as xr
 from . import grid
+from collections.abc import Mapping
 import numpy as np
-from typing import Literal, overload
-
+from typing import Literal
+from . import attrs
+from typing import TypeVar, Generic
 
 
 def to_scalar(x):
     return np.ndarray.item(x.data)
 
 
+xrDataArrayOrSet = TypeVar("xrDataArrayOrSet", xr.Dataset, xr.DataArray)
+
+
+class CommonAccessor(Generic[xrDataArrayOrSet]):
+    _obj: xrDataArrayOrSet
+
+    _namespace: str = "_"
+
+    def __init__(self, xarray_obj: xrDataArrayOrSet):
+        self._obj = xarray_obj
+
+    @property
+    def _(self) -> xrDataArrayOrSet:
+        return self._obj
+
+    def __getitem__(self, key):
+        return self._obj[key].wsi
+
+    def data(self):
+        return self._obj.data
+
+    @property
+    def attrs(self) -> Mapping:
+        return attrs.XarrayAttrsProxy(self._obj.attrs)
+
+    @attrs.setter
+    def attrs(self, value: Mapping):
+        new_attr = {}
+        a = attrs.XarrayAttrsProxy(new_attr)
+        a.update(value)
+
+        self._obj.attrs.clear()
+        self._obj.attrs.update(a.data)
+
+        return attrs.XarrayAttrsProxy(self._obj.attrs)
+
+    def __getattr__(self, key):
+        try:
+            ret = getattr(self._obj, key)
+            try:
+                return ret.wsi
+            except:
+                return ret
+        except:
+            raise AttributeError
+
+    def _repr_html_(self) -> str:
+        n = type(self._obj).__name__
+        try:
+            type(self._obj).__name__ = n + "." + self._namespace
+            return self._obj._repr_html_()
+        finally:
+            type(self._obj).__name__ = n
+
+
+class CommonGridAccessor(Generic[xrDataArrayOrSet], CommonAccessor[xrDataArrayOrSet]):
+    _namespace = "grid"
+
+
 @xr.register_dataarray_accessor("grid")
-class GridArrayAccessor:
+class GridArrayAccessor(CommonGridAccessor[xr.DataArray]):
     def __init__(self, xarray_obj: xr.DataArray):
         self._obj = xarray_obj
         self._check: bool | None = None
@@ -63,6 +124,12 @@ class GridArrayAccessor:
 
     @property
     def spacing(self) -> int | float:
+        """
+        _summary_
+
+        :return: _description_
+        :rtype: int | float
+        """
         return self.grid.spacing
 
     @property
@@ -70,7 +137,7 @@ class GridArrayAccessor:
         return self.grid.shift
 
     @property
-    def size(self) -> int | float:
+    def size(self) -> int | None:
         return self.grid.size
 
     @property
@@ -99,7 +166,7 @@ def _safe_coord_map(func, x: xr.Dataset):
 
 
 @xr.register_dataset_accessor("grid")
-class GridDatasetAccessor:
+class GridDatasetAccessor(CommonGridAccessor[xr.Dataset]):
     def __init__(self, xarray_obj: xr.Dataset):
         self._obj = xarray_obj
 
@@ -136,23 +203,52 @@ class GridDatasetAccessor:
         return _safe_coord_map(lambda x: x.grid.max, self._obj)
 
 
-@xr.register_dataarray_accessor("wsi")
-class TiffArrayAccessor:
-    def __init__(self, xarray_obj: xr.DataArray):
-        self._obj = xarray_obj
+class CommonWSIAccessor(Generic[xrDataArrayOrSet], CommonAccessor[xrDataArrayOrSet]):
+    _namespace = "wsi"
+
+    def um(self, default=None, override=None, deep=True) -> xrDataArrayOrSet:
+        return index_by(self.mpp(default, override, deep)._, "um").wsi
+
+    def px(self, default=None, override=None, deep=True) -> xrDataArrayOrSet:
+        return index_by(self.mpp(default, override, deep)._, "px").wsi
+
+    def mpp(self, default=None, override=None, deep=True) -> WSIDatasetAccessor:
+        x = self._obj.copy()
+
+        def set_mpp(x, mpp) -> xr.DataArray:
+            curr_mpp = x.wsi._mpp
+            if not curr_mpp and x.wsi.is_um:
+                x.attrs["mpp"] = mpp
+                x.wsi.unit = "um"
+                return x
+            if curr_mpp == mpp:
+                return x
+
+            if x.wsi.is_um:
+                x = x * mpp / curr_mpp
+
+            x.attrs["mpp"] = mpp
+            return x
+
+        mpp = override or infer_mpp(x) or default
+        if mpp:
+            x = set_mpp(x, mpp)
+
+            if deep:
+                vars = list(x.coords)
+                if isinstance(x, xr.Dataset):
+                    vars += list(x.data_vars)
+
+                for c in vars:
+                    cx = x[c]
+                    if cx.wsi._mpp or cx.wsi.is_px or cx.wsi.is_um:
+                        mpp = override or cx.wsi._mpp or mpp
+                        x[c] = set_mpp(cx, mpp)
+        return x.wsi
 
     @property
-    def um(self) -> xr.DataArray:
-        return index_by(self._obj, "um")
-
-    @property
-    def px(self) -> xr.DataArray:
-        return index_by(self._obj, "px")
-
-    def resample(
-        self, shift: int | float, spacing: int | float, method="cubic"
-    ) -> xr.DataArray:
-        raise NotImplemented
+    def _mpp(self) -> float | None:
+        return infer_mpp(self._obj)
 
     @property
     def unit(self) -> str | None:
@@ -160,7 +256,7 @@ class TiffArrayAccessor:
 
     @unit.setter
     def unit(self, v: str):
-        for k in self._obj.attrs:
+        for k in list(self._obj.attrs):
             if k.lower() in {"unit", "units"}:
                 del self._obj.attrs[k]
 
@@ -182,23 +278,13 @@ class TiffArrayAccessor:
             "micrometers",
         }
 
-    def mpp(self, default=None, override=None, deep=True) -> TiffArrayAccessor:
-        x = self._obj.copy()
-        mpp = override or infer_mpp(x) or default
-        if mpp:
-            if x.wsi._mpp or x.wsi.is_px or x.wsi.is_um:
-                x.attrs["mpp"] = mpp
 
-            if deep:
-                for c in list(x.coords):
-                    c = x.coords[c]
-                    if c.wsi._mpp or c.wsi.is_px or c.wsi.is_um:
-                        c.attrs["mpp"] = override or c.wsi._mpp or mpp
-        return x.wsi
-
-    @property
-    def _mpp(self) -> float | None:
-        return infer_mpp(self._obj)
+@xr.register_dataarray_accessor("wsi")
+class WSIArrayAccessor(CommonWSIAccessor[xr.DataArray]):
+    def resample(
+        self, shift: int | float, spacing: int | float, method="cubic"
+    ) -> xr.DataArray:
+        raise NotImplemented
 
     @property
     def pil(self):
@@ -206,68 +292,29 @@ class TiffArrayAccessor:
 
         return Image.fromarray(self._obj.data)
 
-    def show(self, *, yincrease=False, **kwargs):
-        result = self._obj.plot.imshow(yincrease=yincrease, **kwargs)
+    def show(self, *, yincrease=False, figsize=None, aspect=1, **kwargs):
         import matplotlib.pyplot as plt
 
-        plt.gca().set_aspect(1)
+        if figsize:
+            plt.figure(figsize=figsize)
+
+        result = self._obj.plot.imshow(yincrease=yincrease, **kwargs)
+
+        plt.gca().set_aspect(aspect)
         return result
 
 
 @xr.register_dataset_accessor("wsi")
-class TiffDatasetAccessor:
-    def __init__(self, xarray_obj: xr.Dataset):
-        self._obj = xarray_obj
-
+class WSIDatasetAccessor(
+    CommonWSIAccessor[xr.Dataset],
+):
     @property
-    def um(self) -> xr.Dataset:
-        return index_by(self._obj, "um")
-
-    @property
-    def px(self) -> xr.Dataset:
-        return index_by(self._obj, "px")
-
-    def mpp(self, default=None, override=None, deep=True) -> TiffDatasetAccessor:
-        x = self._obj.copy()
-        mpp = override or infer_mpp(x) or default
-        if mpp:
-            x.attrs["mpp"] = mpp
-
-            if deep:
-                for c in list(x.coords):
-                    c = x.coords[c]
-                    if c.wsi._mpp or c.wsi.is_px or c.wsi.is_um:
-                        c.attrs["mpp"] = override or c.wsi._mpp or mpp
-                for c in list(x.data_vars):
-                    c = x[c]
-                    if c.wsi._mpp in c.attrs or c.wsi.is_px or c.wsi.is_um:
-                        c.attrs["mpp"] = override or c.wsi._mpp or mpp
-
-        return x.wsi
-
-    @property
-    def _mpp(self) -> float | None:
-        return infer_mpp(self._obj)
-
-    @property
-    def unit(self) -> str | None:
-        return infer_units(self._obj)
+    def is_um(self) -> bool:
+        return False
 
     @property
     def is_px(self) -> bool:
-        u = str(self._obj.wsi.unit)
-        return u.strip().lower() in {"px", "pixel", "pixels"}
-
-    @property
-    def is_um(self) -> bool:
-        u = str(self._obj.wsi.unit)
-        return u.strip().lower() in {
-            "um",
-            "micron",
-            "microns",
-            "micrometer",
-            "micrometers",
-        }
+        return False
 
 
 def infer_mpp(x: xr.Dataset | xr.DataArray) -> float | None:
@@ -286,12 +333,11 @@ def infer_mpp(x: xr.Dataset | xr.DataArray) -> float | None:
 def infer_units(x: xr.Dataset | xr.DataArray) -> str | None:
     """Returns the units of the xarray, inferred from (by precedence):
 
-    1. The "x.data.units" attribute, where pint stores units.
-    2. The stored value in x.attr["unit"] or x.attr["units"] (case insensitive)
-    3. None.
+    1. The stored value in x.attr["unit"] or x.attr["units"] (case insensitive)
+    2. None.
     """
-    if hasattr(x.data, "units"):
-        return str(x.data.units)
+    # if hasattr(x.data, "units"):  # Triggers reload!!!
+    #     return str(x.data.units)
 
     attr = x.attrs
     for k in attr:
@@ -301,24 +347,14 @@ def infer_units(x: xr.Dataset | xr.DataArray) -> str | None:
     return None
 
 
-@overload
-def index_by(slide: xr.Dataset, unit: Literal["px"] | Literal["um"]) -> xr.Dataset:
-    ...
-
-
-@overload
-def index_by(slide: xr.DataArray, unit: Literal["px"] | Literal["um"]) -> xr.DataArray:
-    ...
-
-
 def index_by(
-    slide: xr.Dataset | xr.DataArray, unit: Literal["px"] | Literal["um"]
-) -> xr.Dataset | xr.DataArray:
+    slide: xrDataArrayOrSet, unit: Literal["px"] | Literal["um"]
+) -> xrDataArrayOrSet:
     """Convert coordinates between pixels (px) and microns (um) units based on the inferred microns-per-pixel (mpp)."""
 
     assert unit in ["px", "um"]
 
-    def convert(cx, mpp):
+    def convert(cx: xr.DataArray, mpp) -> xr.DataArray:
         if unit == "um":
             if cx.wsi.is_px:
                 cx = cx * mpp
@@ -337,15 +373,13 @@ def index_by(
     mpp_found = False
 
     vars = list(slide.coords)
-
     if isinstance(slide, xr.Dataset):
         vars += list(slide.data_vars)
     elif slide.wsi._mpp:
         slide = convert(slide, slide.wsi._mpp)
 
-    for c in list(slide.coords):
+    for c in vars:
         cx = slide[c]
-
         # continue if can't infer mpp
         mpp = cx.wsi._mpp or slide.wsi._mpp
 

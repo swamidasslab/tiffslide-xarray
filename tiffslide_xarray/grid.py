@@ -1,39 +1,29 @@
 from __future__ import annotations
 
-from typing import NamedTuple, Any, Callable, Sequence
+from typing import NamedTuple, Any, Callable, Sequence, Union 
 import numpy as np
-
-
+from numpy.typing import ArrayLike
 import tree
 
 KerasModel = Any
+Number =  Union[int,float]
 
-class OpenRegularGrid(NamedTuple):
-    origin: float | int = 0
-    spacing:  float | int = 1
+def asnumber(x = Number | ArrayLike) -> Number:
+    if isinstance(x, Number):
+        if int(x) == x:
+            return int(x)
+        return x
+    else:
+        return np.asarray(x).item()
 
-    @property
-    def shift(self) -> int | float:
-        return self.origin % self.spacing
-    
-    @property
-    def ndim(self) -> int:
-        return 1
-    
-    @property
-    def dtype(self) -> np.dtype:
-        if isinstance(self.origin, int) and isinstance(self.spacing, int):
-            return np.dtype("int")
-        else:
-            return np.dtype("float")
-        
 
 class RegularGrid(NamedTuple):
     """Follows the same semantics as ITK.
     https://simpleitk.readthedocs.io/en/master/fundamentalConcepts.html"""
+
     origin: float | int = 0
-    spacing:  float | int = 1
-    size: int = 0
+    spacing: float | int = 1
+    size: int | None = None
 
     # def __init__(self, origin: float | int = 0, spacing: float | int = 1, size: int | None = None):
     #     self._origin = origin
@@ -59,24 +49,24 @@ class RegularGrid(NamedTuple):
     #     return repr(self)
 
     @property
-    def range(self) -> int | float:
-        return  self.spacing * (self.size - 1) # type: ignore
-    
+    def range(self) -> Number:
+        return self.spacing * (self.size - 1)  # type: ignore
+
     @property
     def shape(self) -> tuple[int]:
         if isinstance(self.size, int):
             return (self.size,)
 
-        raise NotImplementedError
-    
+        raise AssertionError
+
     @property
-    def shift(self) -> int | float:
+    def shift(self) -> Number:
         return self.origin % self.spacing
-    
+
     @property
     def ndim(self) -> int:
         return 1
-    
+
     @property
     def dtype(self) -> np.dtype:
         if isinstance(self.origin, int) and isinstance(self.spacing, int):
@@ -84,10 +74,13 @@ class RegularGrid(NamedTuple):
         else:
             return np.dtype("float")
 
-        
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return self.origin == other.origin and self.spacing == other.spacing and self.size == other.size
+            return (
+                self.origin == other.origin
+                and self.spacing == other.spacing
+                and self.size == other.size
+            )
         return False
 
     def __array_function__(self, func, types, args: tuple, kwargs: dict):
@@ -101,13 +94,12 @@ class RegularGrid(NamedTuple):
         args, kwargs = nested_cast_to_array(args, kwargs, dtype=self.__class__)
         return func(*args, **kwargs)
 
-
     def __array_ufunc__(self, func, types, args: tuple, kwargs: dict):
         return NotImplemented
-    
-    def __array_namespace__(self, *, api_version = None):
+
+    def __array_namespace__(self, *, api_version=None):
         return np
-    
+
     @classmethod
     def from_coord(cls, coord: Sequence[float], maybe_cast_to_int=False) -> RegularGrid:
         """Assumes coordinate is a regularly spaced sequence of numbers. TODO: add checks and relax this assumption"""
@@ -124,7 +116,7 @@ class RegularGrid(NamedTuple):
 
     def __array__(self):
         return np.arange(0, self.size) * self.spacing + self.origin
-    
+
     # @property
     # def data(self):
     #     return self
@@ -134,12 +126,29 @@ class RegularGrid(NamedTuple):
         return np.arange(self.size) * self.spacing + self.origin
 
     def __add__(self, other):
+        if isinstance(other, self.__class__):
+            
+            if other.size == self.size or ( (self.size is None) and (other.size is None)):
+                return RegularGrid(
+                    self.origin + other.origin,
+                    self.spacing + other.spacing,
+                    size=self.size,
+                )
+            else:
+                return NotImplemented
+            
+
         try:
-            return RegularGrid(
-                origin=self.origin + other, spacing=self.spacing, size=self.size
+            other = asnumber(other)
+            return RegularGrid(  
+                origin=self.origin + other, # type: ignore
+                spacing=self.spacing,
+                size=self.size,
             )
         except:
-            raise NotImplemented
+            pass
+
+        return NotImplemented
 
     def __sub__(self, other):
         try:
@@ -147,15 +156,11 @@ class RegularGrid(NamedTuple):
                 origin=self.origin - other, spacing=self.spacing, size=self.size
             )
         except:
-            raise NotImplemented
+            return NotImplemented
 
     def __radd__(self, other):
-        try:
-            return RegularGrid(
-                origin=self.origin + other, spacing=self.spacing, size=self.size
-            )
-        except:
-            raise NotImplemented
+        return self.__add__(other)
+
 
     def __len__(self):
         return self.size
@@ -184,7 +189,6 @@ class RegularGrid(NamedTuple):
         except:
             raise NotImplemented
 
-
     def __getitem__(self, key: int | slice | tuple[int | slice]):
         if isinstance(key, tuple):
             key = key[0]
@@ -201,21 +205,21 @@ class RegularGrid(NamedTuple):
             return self.origin + key * self.spacing
 
         if isinstance(key, slice):  # type: ignore
-            # if self.size is not None:
+            if self.size is not None:
                 key = slice(*key.indices(self.size))
 
                 origin = self.origin + key.start * self.spacing
                 spacing = key.step * self.spacing
                 size = max(key.stop - key.start, 0) // key.step
-            # else:
-            #     start = key.start or 0
-            #     step = key.step or 1
+            else:
+                start = key.start or 0
+                step = key.step or 1
 
-            #     origin = self.origin + start * self.spacing
-            #     spacing = self.spacing * step
-            #     size = None
+                origin = self.origin + start * self.spacing
+                spacing = self.spacing * step
+                size = None
 
-                return RegularGrid(origin=origin, spacing=spacing, size=size)
+            return RegularGrid(origin=origin, spacing=spacing, size=size)
 
         raise KeyError(key)
 
@@ -225,7 +229,7 @@ class RegularGrid(NamedTuple):
             (self.size + 1) * self.spacing if self.size else None,
             self.spacing,
         )
-    
+
     def __slice__(self):
         return self.to_slice()
 
@@ -244,6 +248,27 @@ class RegularGrid(NamedTuple):
             size = size // shape.stride
 
         return RegularGrid(origin, spacing, size)
+
+
+class OpenRegularGrid(RegularGrid):
+    origin: float | int = 0
+    spacing: float | int = 1
+    size: None = None
+
+    @property
+    def shift(self) -> Number:
+        return self.origin % self.spacing
+
+    @property
+    def ndim(self) -> int:
+        return 1
+
+    @property
+    def dtype(self) -> np.dtype:
+        if isinstance(self.origin, int) and isinstance(self.spacing, int):
+            return np.dtype("int")
+        else:
+            return np.dtype("float")
 
 
 class DownSamplerShape(NamedTuple):
