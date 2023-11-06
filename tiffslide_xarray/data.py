@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import tiffslide
 import numpy as np
 import xarray as xr
