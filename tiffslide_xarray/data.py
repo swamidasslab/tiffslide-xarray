@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import tiffslide
+
 import numpy as np
 import xarray as xr
 from datatree import DataTree
@@ -9,6 +9,7 @@ import os
 
 from xarray.backends import BackendArray, CachingFileManager, BackendEntrypoint
 from xarray.core import indexing
+
 
 
 def load_tiff_level(
@@ -61,6 +62,8 @@ def _load_tiff_level(
 ) -> xr.Dataset:
     """Lazy load a particular level of a tiff slide. Add coordinates, attributes, and set encodings
     to reasonable defaults."""
+    import tiffslide
+    
     with file_manager.acquire_context() as (zarr, slide):  # type: ignore
         f: tiffslide.TiffSlide = slide  # type: ignore
         n_levels = len(f.level_dimensions)  # type: ignore
@@ -81,11 +84,6 @@ def _load_tiff_level(
         }
 
         array_attrs = zarr.attrs
-        # {
-        #     k: v
-        #     for k, v in f.properties.items()
-        #     if (v != None and f"tiffslide.level[{level}]" in k)
-        # }
 
     if downsample == int(downsample):
         downsample = int(downsample)
@@ -209,7 +207,7 @@ class TiffSlideArray(BackendArray):
 
 class _ZarrTiffSlide(NamedTuple):
     zarr: xr.Dataset
-    slide: tiffslide.TiffSlide
+    slide: Any
 
     def close(self):
         for x in self:
@@ -217,6 +215,8 @@ class _ZarrTiffSlide(NamedTuple):
 
 
 def _zarr_tiffslide_opener(fname, **kwargs) -> _ZarrTiffSlide:
+    import tiffslide
+
     slide = tiffslide.TiffSlide(fname, **kwargs)
     zarr: xr.Dataset = xr.open_zarr(
         slide.zarr_group.store,
