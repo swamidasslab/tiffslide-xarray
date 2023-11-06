@@ -8,12 +8,13 @@ We register two xarray accessors:
 """
 
 import xarray as xr
-from . import grid
 from collections.abc import Mapping
+from collections import namedtuple
 import numpy as np
-from typing import Literal
+from typing import Literal, TypeVar, Generic, TypeGuard, Protocol
+from typing_extensions import cast
+from . import grid
 from . import attrs
-from typing import TypeVar, Generic
 
 
 def to_scalar(x):
@@ -31,12 +32,25 @@ class CommonAccessor(Generic[xrDataArrayOrSet]):
     def __init__(self, xarray_obj: xrDataArrayOrSet):
         self._obj = xarray_obj
 
+    def __getattr__(self, key):
+        if hasattr(self._obj, key):
+            ret = getattr(self._obj, key)
+        else:
+            raise AttributeError
+
+        if isinstance(ret, xr.Dataset | xr.DataArray):
+            try:
+                ret = getattr(ret, self._namespace)
+            except:
+                pass
+        return ret
+
     @property
     def _(self) -> xrDataArrayOrSet:
         return self._obj
 
     def __getitem__(self, key):
-        return self._obj[key].wsi
+        return getattr(self._obj[key], self._namespace)
 
     def data(self):
         return self._obj.data
@@ -46,7 +60,7 @@ class CommonAccessor(Generic[xrDataArrayOrSet]):
         return attrs.XarrayAttrsProxy(self._obj.attrs)
 
     @attrs.setter
-    def attrs(self, value: Mapping):
+    def attrs(self, value: Mapping) -> attrs.XarrayAttrsProxy:
         new_attr = {}
         a = attrs.XarrayAttrsProxy(new_attr)
         a.update(value)
@@ -55,16 +69,6 @@ class CommonAccessor(Generic[xrDataArrayOrSet]):
         self._obj.attrs.update(a.data)
 
         return attrs.XarrayAttrsProxy(self._obj.attrs)
-
-    def __getattr__(self, key):
-        try:
-            ret = getattr(self._obj, key)
-            try:
-                return ret.wsi
-            except:
-                return ret
-        except:
-            raise AttributeError
 
     def _repr_html_(self) -> str:
         n = type(self._obj).__name__
@@ -75,8 +79,75 @@ class CommonAccessor(Generic[xrDataArrayOrSet]):
             type(self._obj).__name__ = n
 
 
+Box = namedtuple("Box", ["min", "max"])
+
+
+def _safe_map(func, maybe_mapping) -> dict:
+    out = {}
+
+    for k in maybe_mapping:
+        try:
+            out[k] = func(maybe_mapping[k])
+        except AssertionError:
+            pass
+
+    return out
+
+
 class CommonGridAccessor(Generic[xrDataArrayOrSet], CommonAccessor[xrDataArrayOrSet]):
     _namespace = "grid"
+
+    @property
+    def grids(self) -> dict[str, grid.RegularGrid]:
+        x = self._obj
+        # the grids of all coordinates
+        return {
+            name: arr.grid._this_grid for name, arr in x.coords.items()
+        }  # type: ignore
+
+    @property
+    def origin(self) -> dict[str, int | float]:
+        return _safe_map(lambda x: x.origin, self.grids)
+
+    @property
+    def spacing(self) -> dict[str, int | float]:
+        return _safe_map(lambda x: x.spacing, self.grids)
+
+    @property
+    def shift(self) -> dict[str, int | float]:
+        return _safe_map(lambda x: x.shift, self.grids)
+
+    @property
+    def size(self) -> dict[str, int | float]:
+        return _safe_map(lambda x: x.size, self.grids)
+
+    @property
+    def min(self) -> dict[str, int | float]:
+        return _safe_map(lambda x: x.data.min(), self._obj.coords)
+
+    @property
+    def max(self) -> dict[str, int | float]:
+        return _safe_map(lambda x: x.data.max(), self._obj.coords)
+
+    @property
+    def range(self) -> dict[str, int | float]:
+        return _safe_map(lambda x: x.data.max() - x.data.min(), self._obj.coords)
+
+    @property
+    def box(self) -> Box:
+        return Box(min=self.min, max=self.max)
+
+    def __xarray_slice__(self) -> dict[str, slice]:
+        box = self.box
+        s = {}
+        for k in box.min:
+            s[k] = slice(box.min[k], box.max[k])
+
+        return s
+
+    @property
+    def slice(self) -> dict[str, slice]:
+        return self.__xarray_slice__()
 
 
 @xr.register_dataarray_accessor("grid")
@@ -87,9 +158,10 @@ class GridArrayAccessor(CommonGridAccessor[xr.DataArray]):
         self._grid: grid.RegularGrid | None = None
 
     @property
-    def grid(self) -> grid.RegularGrid:
+    def _this_grid(self) -> grid.RegularGrid:
         if self._grid:
             return self._grid
+
         x = self._obj
         assert x.grid.check, "Not a regularly spaced 1D vector."
         self._grid = grid.RegularGrid.from_coord(x.data)
@@ -108,102 +180,26 @@ class GridArrayAccessor(CommonGridAccessor[xr.DataArray]):
             return True
 
         deltas = x[:-1] - x[1:]
-        return np.allclose(deltas[:-1], deltas[1:])
+        return np.allclose(deltas[:-1], deltas[1:]) #type: ignore
 
     @property
     def check(self) -> bool:
-        """Returns True only if this is a regularly spaced 1D vector. Result is cached, and will not update if values of array are altered."""
+        """Returns True only if this is a regularly spaced 1D vector.
+        Result is cached, and will not update if values of array are altered."""
         if self._check:
             return self._check
         self._check = self._check_regular_spacing()
         return self._check
 
-    @property
-    def origin(self) -> int | float:
-        return self.min
-
-    @property
-    def spacing(self) -> int | float:
-        """
-        _summary_
-
-        :return: _description_
-        :rtype: int | float
-        """
-        return self.grid.spacing
-
-    @property
-    def shift(self) -> int | float:
-        return self.grid.shift
-
-    @property
-    def size(self) -> int | None:
-        return self.grid.size
-
-    @property
-    def min(self) -> int | float:
-        assert len(self._obj.dims) == 1
-        return to_scalar(self._obj[0])
-
-    @property
-    def max(self) -> int | float:
-        assert len(self._obj.dims) == 1
-        return to_scalar(self._obj[-1])
-
-    @property
-    def range(self) -> int | float:
-        return self.max - self.min  # type: ignore
-
-
-def _safe_coord_map(func, x: xr.Dataset):
-    out = {}
-    for k in x.coords:
-        try:
-            out[k] = func(x.coords[k])
-        except AssertionError:
-            pass
-    return out
-
 
 @xr.register_dataset_accessor("grid")
 class GridDatasetAccessor(CommonGridAccessor[xr.Dataset]):
-    def __init__(self, xarray_obj: xr.Dataset):
-        self._obj = xarray_obj
-
-    @property
-    def grid(self) -> dict[str, grid.RegularGrid]:
-        return _safe_coord_map(lambda x: x.grid.grid, self._obj)
-
-    @property
-    def origin(self) -> dict[str, int | float]:
-        return _safe_coord_map(lambda x: x.grid.origin, self._obj)
-
-    @property
-    def spacing(self) -> dict[str, int | float]:
-        return _safe_coord_map(lambda x: x.grid.spacing, self._obj)
-
-    @property
-    def shift(self) -> dict[str, int | float]:
-        return _safe_coord_map(lambda x: x.grid.shift, self._obj)
-
-    @property
-    def size(self) -> dict[str, int | float]:
-        return _safe_coord_map(lambda x: x.grid.size, self._obj)
-
-    @property
-    def min(self) -> dict[str, int | float]:
-        return _safe_coord_map(lambda x: x.grid.min, self._obj)
-
-    @property
-    def max(self) -> dict[str, int | float]:
-        return _safe_coord_map(lambda x: x.grid.max, self._obj)
-
-    @property
-    def range(self) -> dict[str, int | float]:
-        return _safe_coord_map(lambda x: x.grid.max, self._obj)
+    pass
 
 
-class CommonWSIAccessor(Generic[xrDataArrayOrSet], CommonAccessor[xrDataArrayOrSet]):
+class CommonWSIAccessor(
+    Generic[xrDataArrayOrSet], CommonGridAccessor[xrDataArrayOrSet]
+):
     _namespace = "wsi"
 
     def um(self, default=None, override=None, deep=True) -> xrDataArrayOrSet:
