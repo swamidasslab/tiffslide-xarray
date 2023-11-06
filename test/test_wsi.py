@@ -2,7 +2,7 @@ import pytest
 import xarray as xr
 import numpy as np
 import tiffslide_xarray
-import tiffslide_xarray.accessors # necessary for accessors
+import tiffslide_xarray.accessors  # necessary for accessors
 
 
 @pytest.fixture
@@ -26,16 +26,16 @@ def test_wsi_ipy_repr(slide_dataset):
     assert "xarray.Dataset<" in S._repr_html_()
 
     # They are "xarray.Dataset.wsi" in wsi namespace
-    assert "xarray.Dataset.wsi" in S.wsi._repr_html_()    
+    assert "xarray.Dataset.wsi" in S.wsi._repr_html_()
 
     # DataArrays are normally displayed as "xarray.DataArray"
     assert "xarray.DataArray<" in S.image._repr_html_()
 
     # They are "xarray.DataArray.wsi" in wsi namespace
-    assert "xarray.DataArray.wsi" in S.image.wsi._repr_html_()   
-    assert "xarray.DataArray.wsi" in S.x.wsi._repr_html_() 
-    assert "xarray.DataArray.wsi" in S.y.wsi._repr_html_()   
-    assert "xarray.DataArray.wsi" in S.wsi.image._repr_html_()  
+    assert "xarray.DataArray.wsi" in S.image.wsi._repr_html_()
+    assert "xarray.DataArray.wsi" in S.x.wsi._repr_html_()
+    assert "xarray.DataArray.wsi" in S.y.wsi._repr_html_()
+    assert "xarray.DataArray.wsi" in S.wsi.image._repr_html_()
 
 
 def test_wsi_namespace(slide_dataset):
@@ -107,13 +107,12 @@ def test_mpp_coords(slide_dataset):
     assert np.allclose(x_um, S.wsi.px(mpp * 2).um().mpp(override=mpp).x)
     assert np.allclose(x_um, S.wsi.px(mpp * 2).mpp(override=mpp).x.um())
 
-
     # calling wsi.um last leads to an x-coord  with "um" unit
     assert S.wsi.um(mpp).x.unit == "um"
     assert S.wsi.um(mpp).y.unit == "um"
     # with the mpp atribute set:
-    assert S.wsi.um(mpp).x.attrs['mpp'] == mpp
-    assert S.wsi.um(mpp).y.attrs['mpp'] == mpp
+    assert S.wsi.um(mpp).x.attrs["mpp"] == mpp
+    assert S.wsi.um(mpp).y.attrs["mpp"] == mpp
     # and x equal to x_um, no matter how many intervening calls of px, mpp, or um
     assert np.allclose(x_um, S.wsi.um(mpp).x)
     assert np.allclose(x_um, S.wsi.um(mpp).um().x)
@@ -123,13 +122,14 @@ def test_mpp_coords(slide_dataset):
     assert np.allclose(x_um, S.wsi.mpp(mpp).um().x)
     assert np.allclose(x_um, S.wsi.mpp(mpp).px().um().x)
 
+
 def test_mpp_datavars(slide_dataset):
     S = slide_dataset.copy()
 
     mpp = 0.5
-    image = S.image.data *1.0
-    #data variables do not have px or um units
-    assert S.image.wsi.unit not in ["um", 'px']
+    image = S.image.data * 1.0
+    # data variables do not have px or um units
+    assert S.image.wsi.unit not in ["um", "px"]
     assert not S.image.wsi.is_px
     assert not S.image.wsi.is_um
 
@@ -159,5 +159,3 @@ def test_mpp_datavars(slide_dataset):
     assert np.allclose(image, S.image.wsi.px(mpp))
     assert np.allclose(image, S.wsi.mpp(mpp).image)
     assert np.allclose(image, S.image.wsi.mpp(mpp))
-
-
