@@ -120,7 +120,7 @@ def keras_model_1D(draw):
 
     return K.Model(i, x)
 
-@pytest.mark.skipif(not TEST_WITH_KERAS, reason="TEST_WITH_TF env variable not set.")
+@pytest.mark.skipif(not TEST_WITH_TF, reason="TEST_WITH_TF env variable not set.")
 @given(model=keras_model_1D())
 def test_keras_analysis(model):
     import tensorflow.keras as K
