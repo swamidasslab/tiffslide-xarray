@@ -2,7 +2,7 @@ import tiffslide
 import numpy as np
 import xarray as xr
 from datatree import DataTree
-from typing import Optional, Any, NamedTuple
+from typing import Optional, Any, NamedTuple, Callable
 import os
 
 from xarray.backends import BackendArray, CachingFileManager, BackendEntrypoint
@@ -30,6 +30,7 @@ def open_all_levels(
     fname: str,
     tifffile_options: Optional[dict[str, Any]] = None,
     storage_options: Optional[dict[str, Any]] = None,
+    level_to_group: Callable[[int], str] = lambda level: "/" if not level else f"level{level}",
 ) -> DataTree:
     """Load all levels of a tiff slide into a datatree.DataTree."""
 
@@ -46,7 +47,8 @@ def open_all_levels(
     for level in range(n_levels):
         x = _load_tiff_level(file_manager, fname, level)
 
-        tree["/" if level == 0 else f"level{level}"] = x
+        #tree["/" if level == 0 else f"level{level}"] = x
+        tree[level_to_group(level)] = x
 
     tree = DataTree.from_dict(tree)
     return tree
