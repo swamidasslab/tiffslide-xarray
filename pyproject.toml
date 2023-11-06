@@ -26,10 +26,19 @@ classifiers = [
 python = "^3.9"
 xarray = "^2023.9.0"
 xarray-datatree = "^0.0.12"
-tiffslide = "^2.2.0"
+dm-tree = "^0.1.8"
 
 [tool.poetry.plugins."xarray.backends"]
 tiffslide = "tiffslide_xarray:TiffBackendEntrypoint"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+tiffslide = "^2.2.0"
+poetry-dynamic-versioning=">=1.0.0,<2.0.0"
+
+[tool.poetry.group.tiff.dependencies]
+tiffslide = "^2.2.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
