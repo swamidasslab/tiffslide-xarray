@@ -115,7 +115,7 @@ class RegularGrid(NamedTuple):
         )
 
     def __array__(self):
-        return np.arange(0, self.size) * self.spacing + self.origin
+        return np.arange(0, self.size) * self.spacing + self.origin # type: ignore
 
     # @property
     # def data(self):
