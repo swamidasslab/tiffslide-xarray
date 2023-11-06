@@ -2,6 +2,7 @@ import pytest
 import xarray as xr
 import numpy as np
 import tiffslide_xarray
+import tiffslide_xarray.accessors # necessary for accessors
 
 
 @pytest.fixture
