@@ -1,10 +1,11 @@
 import xarray as xr
+import tiffslide_xarray
 
-TEST_SLIDE = "http://openslide.cs.cmu.edu/download/openslide-testdata/Aperio/CMU-1-Small-Region.svs"
+TEST_SLIDE = "https://openslide.cs.cmu.edu/download/openslide-testdata/Aperio/CMU-1-Small-Region.svs"
 
 
 def test_load():
-    x = xr.open_dataset(TEST_SLIDE)
+    x = xr.open_dataset(TEST_SLIDE, engine="tiffslide")
 
     assert x.attrs["source_file"] == TEST_SLIDE
 
