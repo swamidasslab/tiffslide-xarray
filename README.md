@@ -58,7 +58,7 @@ slide.
 ```python
 from tiffslide_xarray import open_all_levels
 
-slide = open_all_levels(input.svs)
+slide = open_all_levels("input.svs")
 ```
 
 The returned datatree places level0 at the root group, and places subsequent
@@ -121,7 +121,7 @@ roi2 = 3.0 * roi   # no read
 This package extends xarray with a new accessor, called "wsi," which can be enabled with this import.
 
 ```python
-import tiffslide.accessor
+import tiffslide_xarray.accessor
 ```
 
 Eventually, this import will be made automatically, once this api has fully stabilized. The functions of this
@@ -178,7 +178,7 @@ region of interest stored in an xarray object (roi),
 
 ```python
 
-slide_roi = slide.sel(**rio.wsi.slice)
+slide_roi = slide.sel(**roi.wsi.slice)
 ```
 
 ## Converting to PIL
