@@ -202,12 +202,12 @@ class CommonWSIAccessor(
     _namespace = "wsi"
 
     def um(self, default=None, override=None, deep=True) -> xrDataArrayOrSet:
-        return index_by(self.mpp(default, override, deep)._, "um").wsi
+        return index_by(self.set_mpp(default, override, deep)._, "um").wsi
 
     def px(self, default=None, override=None, deep=True) -> xrDataArrayOrSet:
-        return index_by(self.mpp(default, override, deep)._, "px").wsi
+        return index_by(self.set_mpp(default, override, deep)._, "px").wsi
 
-    def mpp(self, default=None, override=None, deep=True) -> WSIDatasetAccessor:
+    def set_mpp(self, default=None, override=None, deep=True) -> WSIDatasetAccessor:
         x = self._obj.copy()
 
         def set_mpp(x, mpp) -> xr.DataArray:
