@@ -8,6 +8,7 @@ import tree
 KerasModel = Any
 Number = Union[int, float]
 
+asarray = np.asarray #type: ignore
 
 def asnumber(x) -> Number:
     if isinstance(x, (int, float)):
@@ -15,7 +16,7 @@ def asnumber(x) -> Number:
             return int(x)
         return x
     else:
-        return np.asarray(x).item()
+        return asarray(x).item() #type: ignore
 
 
 class RegularGrid(NamedTuple):
@@ -359,7 +360,7 @@ def nested_cast_to_array(*struct, dtype=RegularGrid) -> tuple:
         if isinstance(x, RegularGrid):
             i = id(x)
             if i not in cache:
-                cache[i] = np.asarray(x)
+                cache[i] = asarray(x) #type: ignore
             return cache[i]
 
     return tree.traverse(caster, struct)  # type: ignore
@@ -399,9 +400,9 @@ def concatenate(X: Sequence, axis=0, out=None, **kwargs):
             continue
         if i.size is None:
             raise NotImplementedError
-        if not np.isclose(x.spacing, i.spacing):
+        if not np.isclose(x.spacing, i.spacing): #type: ignore
             raise NotImplementedError
-        if not np.isclose(x.origin, i.origin + i.size * i.spacing):
+        if not np.isclose(x.origin, i.origin + i.size * i.spacing): #type: ignore
             raise NotImplementedError
         i = RegularGrid(i.origin, i.spacing, i.size + x.size)
 

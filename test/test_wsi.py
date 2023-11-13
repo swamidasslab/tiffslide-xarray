@@ -4,6 +4,7 @@ import numpy as np
 import tiffslide_xarray
 import tiffslide_xarray.accessors  # necessary for accessors
 
+allclose = np.allclose #type: ignore
 
 @pytest.fixture
 def slide_dataset():
@@ -88,24 +89,24 @@ def test_mpp_coords(slide_dataset):
     # calling wsi.px last leads to an x and y-coord  with "px" unit
     assert S.wsi.px(mpp).x.wsi.unit == "px"
     # and x equal to x_px, no matter how many intervening calls of px, mpp, or um
-    assert np.allclose(x_px, S.wsi.px(mpp).x._)
-    assert np.allclose(x_px, S.wsi.um(mpp).px().x._)
-    assert np.allclose(x_px, S.wsi.px(mpp).px().x)
-    assert np.allclose(x_px, S.wsi.px(mpp).um().px().x)
-    assert np.allclose(x_px, S.wsi.um(mpp).px(mpp).x)
-    assert np.allclose(x_px, S.wsi.mpp(mpp).px().x)
-    assert np.allclose(x_px, S.wsi.mpp(mpp).um().px().x)
+    assert allclose(x_px, S.wsi.px(mpp).x._)
+    assert allclose(x_px, S.wsi.um(mpp).px().x._)
+    assert allclose(x_px, S.wsi.px(mpp).px().x)
+    assert allclose(x_px, S.wsi.px(mpp).um().px().x)
+    assert allclose(x_px, S.wsi.um(mpp).px(mpp).x)
+    assert allclose(x_px, S.wsi.mpp(mpp).px().x)
+    assert allclose(x_px, S.wsi.mpp(mpp).um().px().x)
 
     # calling with new mpp doesn't replace first assigned mpp
-    assert np.allclose(x_px * mpp / 2, S.wsi.mpp(mpp / 2).um(mpp).x)
-    assert np.allclose(x_px * mpp / 2, S.wsi.px(mpp / 2).um(mpp).x)
-    assert np.allclose(x_px * mpp / 2, S.wsi.um(mpp / 2).mpp(mpp).um().x)
+    assert allclose(x_px * mpp / 2, S.wsi.mpp(mpp / 2).um(mpp).x)
+    assert allclose(x_px * mpp / 2, S.wsi.px(mpp / 2).um(mpp).x)
+    assert allclose(x_px * mpp / 2, S.wsi.um(mpp / 2).mpp(mpp).um().x)
 
     # unless the mpp is set using the "override" keyword
-    assert np.allclose(x_um, S.wsi.mpp(mpp * 2).um(override=mpp).x)
-    assert np.allclose(x_um, S.wsi.um(mpp * 2).mpp(override=mpp).x)
-    assert np.allclose(x_um, S.wsi.px(mpp * 2).um().mpp(override=mpp).x)
-    assert np.allclose(x_um, S.wsi.px(mpp * 2).mpp(override=mpp).x.um())
+    assert allclose(x_um, S.wsi.mpp(mpp * 2).um(override=mpp).x)
+    assert allclose(x_um, S.wsi.um(mpp * 2).mpp(override=mpp).x)
+    assert allclose(x_um, S.wsi.px(mpp * 2).um().mpp(override=mpp).x)
+    assert allclose(x_um, S.wsi.px(mpp * 2).mpp(override=mpp).x.um())
 
     # calling wsi.um last leads to an x-coord  with "um" unit
     assert S.wsi.um(mpp).x.unit == "um"
@@ -114,13 +115,13 @@ def test_mpp_coords(slide_dataset):
     assert S.wsi.um(mpp).x.attrs["mpp"] == mpp
     assert S.wsi.um(mpp).y.attrs["mpp"] == mpp
     # and x equal to x_um, no matter how many intervening calls of px, mpp, or um
-    assert np.allclose(x_um, S.wsi.um(mpp).x)
-    assert np.allclose(x_um, S.wsi.um(mpp).um().x)
-    assert np.allclose(x_um, S.wsi.px(mpp).um().x)
-    assert np.allclose(x_um, S.wsi.px(mpp).px().um().x)
-    assert np.allclose(x_um, S.wsi.um(mpp).um(mpp).x)
-    assert np.allclose(x_um, S.wsi.mpp(mpp).um().x)
-    assert np.allclose(x_um, S.wsi.mpp(mpp).px().um().x)
+    assert allclose(x_um, S.wsi.um(mpp).x)
+    assert allclose(x_um, S.wsi.um(mpp).um().x)
+    assert allclose(x_um, S.wsi.px(mpp).um().x)
+    assert allclose(x_um, S.wsi.px(mpp).px().um().x)
+    assert allclose(x_um, S.wsi.um(mpp).um(mpp).x)
+    assert allclose(x_um, S.wsi.mpp(mpp).um().x)
+    assert allclose(x_um, S.wsi.mpp(mpp).px().um().x)
 
 
 def test_mpp_datavars(slide_dataset):
@@ -134,28 +135,28 @@ def test_mpp_datavars(slide_dataset):
     assert not S.image.wsi.is_um
 
     # data variables are untouched
-    assert np.allclose(image, S.wsi.um(mpp).image)
-    assert np.allclose(image, S.wsi.image.um(mpp))
-    assert np.allclose(image, S.wsi.px(mpp).image)
-    assert np.allclose(image, S.wsi.image.px(mpp))
-    assert np.allclose(image, S.wsi.mpp(mpp).image)
-    assert np.allclose(image, S.wsi.image.mpp(mpp))
+    assert allclose(image, S.wsi.um(mpp).image)
+    assert allclose(image, S.wsi.image.um(mpp))
+    assert allclose(image, S.wsi.px(mpp).image)
+    assert allclose(image, S.wsi.image.px(mpp))
+    assert allclose(image, S.wsi.mpp(mpp).image)
+    assert allclose(image, S.wsi.image.mpp(mpp))
 
     # unless it has units of um/px, and the units are changed
     S.image.wsi.unit = "um"
     assert S.image.wsi.unit == "um"
     assert S.image.wsi.is_um
-    assert np.allclose(image, S.wsi.um(mpp).image)
-    assert np.allclose(image / mpp, S.wsi.px(mpp).image)
-    assert np.allclose(image, S.wsi.mpp(mpp).image)
+    assert allclose(image, S.wsi.um(mpp).image)
+    assert allclose(image / mpp, S.wsi.px(mpp).image)
+    assert allclose(image, S.wsi.mpp(mpp).image)
 
     # unless it has units of um/px, and the units are changed
     S.image.wsi.unit = "px"
     assert S.image.wsi.unit == "px"
     assert S.image.wsi.is_px
-    assert np.allclose(image * mpp, S.wsi.um(mpp).image)
-    assert np.allclose(image * mpp, S.image.wsi.um(mpp))
-    assert np.allclose(image, S.wsi.px(mpp).image)
-    assert np.allclose(image, S.image.wsi.px(mpp))
-    assert np.allclose(image, S.wsi.mpp(mpp).image)
-    assert np.allclose(image, S.image.wsi.mpp(mpp))
+    assert allclose(image * mpp, S.wsi.um(mpp).image)
+    assert allclose(image * mpp, S.image.wsi.um(mpp))
+    assert allclose(image, S.wsi.px(mpp).image)
+    assert allclose(image, S.image.wsi.px(mpp))
+    assert allclose(image, S.wsi.mpp(mpp).image)
+    assert allclose(image, S.image.wsi.mpp(mpp))

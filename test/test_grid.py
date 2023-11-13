@@ -5,6 +5,8 @@ from tiffslide_xarray import grid
 import os
 
 TEST_WITH_TF  =os.environ.get("TEST_WITH_TF", False)
+allclose = np.allclose #type: ignore
+
 
 @given(
     origin=st.floats(allow_nan=False, allow_infinity=False),
@@ -24,7 +26,6 @@ def test_identity_downsample(origin, spacing, size):
 
     assert out == g
 
-
 @given(
     origin=st.floats(-10000, 10000, allow_nan=False, allow_infinity=False),
     spacing=st.floats(0.0001, 100000, allow_nan=False, allow_infinity=False),
@@ -39,14 +40,14 @@ def test_no_padding_downsample(origin, spacing, size, downsample):
     g = grid.RegularGrid(origin, spacing, size)
     out = g.downsample(d)
 
-    assert np.allclose(first, out.origin)
+    assert allclose(first, out.origin)
     assert out.size is not None
-    assert np.allclose(length, out.size)
+    assert allclose(length, out.size)
 
     g = grid.RegularGrid(origin, spacing, None)
     out = g.downsample(d)
 
-    assert np.allclose(first, out.origin)
+    assert allclose(first, out.origin)
     assert out.size is None
 
 
@@ -97,10 +98,10 @@ def test_padding_downsample(origin, spacing, size, downsample, padding, odd):
     out = g.downsample(d)
 
     o = out.origin
-    assert np.allclose(first, o)
+    assert allclose(first, o)
     assert out.size is not None
-    assert np.allclose(length, out.size)
-    assert np.allclose(skips, out.spacing)
+    assert allclose(length, out.size)
+    assert allclose(skips, out.spacing)
 
 
 @st.composite
