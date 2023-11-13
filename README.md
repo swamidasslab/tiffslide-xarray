@@ -181,7 +181,7 @@ region of interest stored in an xarray object (roi),
 slide_roi = slide.sel(**rio.wsi.slice)
 ```
 
-## Regularly-Spaced Grids
+## Converting to PIL
 
 Converting an xarray to a PIL image,
 
