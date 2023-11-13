@@ -72,7 +72,7 @@ The data for each slide is accessible at "image,"
 
 ```python
 slide_level0.image
-slide_level0["image]
+slide_level0["image"]
 ```
 
 Coordinates for the x, y (and z if it exists) dimensions are added, in units of "px" of the level 0
