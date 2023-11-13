@@ -49,6 +49,12 @@ aiohttp = "^3.8.6"
 [tool.poetry.group.tiff.dependencies]
 tiffslide = "^2.2.0"
 
+
+[tool.poetry.group.intake.dependencies]
+intake-xarray = "^0.7.0"
+intake-pattern-catalog = "^2023.3.0"
+intake = "^0.7.0"
+
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 build-backend = "poetry_dynamic_versioning.backend"
