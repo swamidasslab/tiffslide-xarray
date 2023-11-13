@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from typing import NamedTuple, Any, Callable, Sequence, Union 
+from typing import NamedTuple, Any, Callable, Sequence, Union
 import numpy as np
-from numpy.typing import ArrayLike
+
 import tree
 
 KerasModel = Any
-Number =  Union[int,float]
+Number = Union[int, float]
 
-def asnumber(x = Number | ArrayLike) -> Number:
-    if isinstance(x, Number):
+
+def asnumber(x) -> Number:
+    if isinstance(x, (int, float)):
         if int(x) == x:
             return int(x)
         return x
@@ -21,8 +22,8 @@ class RegularGrid(NamedTuple):
     """Follows the same semantics as ITK.
     https://simpleitk.readthedocs.io/en/master/fundamentalConcepts.html"""
 
-    origin: float | int = 0
-    spacing: float | int = 1
+    origin: Number = 0
+    spacing: Number = 1
     size: int | None = None
 
     # def __init__(self, origin: float | int = 0, spacing: float | int = 1, size: int | None = None):
@@ -115,20 +116,15 @@ class RegularGrid(NamedTuple):
         )
 
     def __array__(self):
-        return np.arange(0, self.size) * self.spacing + self.origin # type: ignore
-
-    # @property
-    # def data(self):
-    #     return self
+        return np.arange(0, self.size) * self.spacing + self.origin  # type: ignore
 
     def to_numpy(self) -> np.ndarray:
         assert self.size
         return np.arange(self.size) * self.spacing + self.origin
 
-    def __add__(self, other):
+    def __add__(self, other) -> RegularGrid:
         if isinstance(other, self.__class__):
-            
-            if other.size == self.size or ( (self.size is None) and (other.size is None)):
+            if other.size == self.size:
                 return RegularGrid(
                     self.origin + other.origin,
                     self.spacing + other.spacing,
@@ -136,12 +132,11 @@ class RegularGrid(NamedTuple):
                 )
             else:
                 return NotImplemented
-            
 
         try:
             other = asnumber(other)
-            return RegularGrid(  
-                origin=self.origin + other, # type: ignore
+            return RegularGrid(
+                origin=self.origin + other,  # type: ignore
                 spacing=self.spacing,
                 size=self.size,
             )
@@ -160,7 +155,6 @@ class RegularGrid(NamedTuple):
 
     def __radd__(self, other):
         return self.__add__(other)
-
 
     def __len__(self):
         return self.size

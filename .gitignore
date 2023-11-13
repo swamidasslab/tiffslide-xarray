@@ -1,3 +1,4 @@
+typing
 poetry.lock
 test\.*
 # Byte-compiled / optimized / DLL files

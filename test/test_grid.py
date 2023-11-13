@@ -105,7 +105,7 @@ def test_padding_downsample(origin, spacing, size, downsample, padding, odd):
 
 @st.composite
 def keras_model_1D(draw):
-    import tensorflow.keras as K
+    import keras as K
 
     i = K.Input((None, 3))
     x = i
@@ -123,7 +123,7 @@ def keras_model_1D(draw):
 @pytest.mark.skipif(not TEST_WITH_TF, reason="TEST_WITH_TF env variable not set.")
 @given(model=keras_model_1D())
 def test_keras_analysis(model):
-    import tensorflow.keras as K
+    import keras as K
 
     def size_function(x):
         try:

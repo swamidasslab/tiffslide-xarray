@@ -11,8 +11,7 @@ import xarray as xr
 from collections.abc import Mapping
 from collections import namedtuple
 import numpy as np
-from typing import Literal, TypeVar, Generic, TypeGuard, Protocol
-from typing_extensions import cast
+from typing import Literal, TypeVar, Generic
 from . import grid
 from . import attrs
 
@@ -38,7 +37,7 @@ class CommonAccessor(Generic[xrDataArrayOrSet]):
         else:
             raise AttributeError
 
-        if isinstance(ret, xr.Dataset | xr.DataArray):
+        if isinstance(ret, (xr.Dataset, xr.DataArray)):
             try:
                 ret = getattr(ret, self._namespace)
             except:
