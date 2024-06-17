@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import NamedTuple, Any, Callable, Sequence, Union
+from typing import NamedTuple, Any, Callable, Sequence, Union, Generator
+import itertools
 import numpy as np
+import xarray as xr
 
 import tree
 
@@ -243,6 +245,43 @@ class RegularGrid(NamedTuple):
             size = size // shape.stride
 
         return RegularGrid(origin, spacing, size)
+    
+
+    def partition(self, dss: DownSamplerShape,  approx_size: int)   -> Generator[slice, Any, None]:
+        """
+        Partition this grid into slices that can be downsampled and combined into a single dimension identical
+        to running downsampler on the full grid. The slides overlap if the downsampler requires padding. 
+
+        Parameters
+        ----------
+        dss : DownSamplerShape
+            The downsampler shape that will be applied to the grid. 
+
+        approx_size : int
+            The target size, not including padding, that each partition should include.
+
+        Yields
+        ------
+        Generator[slice, Any, None]
+            _description_
+        """
+        size = self.size
+        assert size is not None, "Cannot partition an infinite grid"
+
+        splits = max(1, int(np.rint(size / approx_size))) #type: ignore
+        spacing = dss.stride
+        padding = dss.padding * 2 + dss.odd
+
+        stride = (size - padding) // (splits * spacing) * spacing
+        strid_mod = (size - padding) % (splits * spacing) // spacing
+
+        patch_size = stride + padding
+
+        for i in range(splits):
+            patch_size = stride + padding + (spacing if i < strid_mod else 0)
+            start = i * stride + spacing * min(i, strid_mod)
+            end = start + patch_size
+            yield slice(start, end)
 
 
 class OpenRegularGrid(RegularGrid):
@@ -311,6 +350,45 @@ class DownSamplerShape(NamedTuple):
         pad = min_size // 2 * sign
         odd = min_size % 2 * sign
         return cls(stride=stride, padding=pad, odd=odd)
+    
+
+    def partition_image(
+        self: DownSamplerShape,
+        D: xr.DataArray,
+        approx_patch_size: int = 1500,
+    ):
+        """
+        Compute patches that partition input image and can be downsampled and combined into a single image identical
+        to running downsampler on the full image.
+
+        Parameters
+        ----------
+        dss : wsiml.patch.DownSamplerShape
+            The downsampler shape to define the overlap between tiles.
+        D : xr.DataArray
+            The data array to partition.
+        approx_patch_size : int, optional
+            The target patch size to aim for, by default is 1500. Does not include
+            padding.
+
+        Yields
+        ------
+        Generator[dict[Hashable, slice], None, None]
+            slicers to index the data array into patches that can be downsampled andcombined by coordinates.
+
+        """
+        g = D.wsi.grids
+        dims = D.dims[:2]
+
+        for i, j in itertools.product(
+            g[dims[0]].partition(self, approx_patch_size),
+            g[dims[1]].partition(self, approx_patch_size),
+        ):
+            slicer = {
+                dims[0]: i,
+                dims[1]: j,
+            }
+            yield slicer
 
 
 def keras_model_change_padding(
