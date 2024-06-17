@@ -23,13 +23,14 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-xarray = "^2023.9.0"
-xarray-datatree = "^0.0.12"
-dm-tree = "^0.1.8"
-envsubst = "^0.1.5"
-ruamel-yaml = "^0.18.5"
-pydantic = "^2.4.2"
+python = ">=3.9,<4.0"
+xarray = ">=2023.9.0"
+xarray-datatree = ">=0.0.12"
+dm-tree = ">=0.1.8"
+envsubst = ">=0.1.5"
+ruamel-yaml = ">=0.18.5"
+numpy = "<2"
+pydantic = ">=2.4.2"
 
 [tool.poetry.plugins."xarray.backends"]
 tiffslide = "tiffslide_xarray:TiffBackendEntrypoint"
@@ -39,20 +40,20 @@ tiffslide_glob = "tiffslide_xarray.intake:TiffSlideGlob"
 tiffslide = "tiffslide_xarray.intake:TiffSlideSource"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-tiffslide = "^2.2.0"
+pytest = ">=7.4.3"
+tiffslide = ">=2.2.0"
 poetry-dynamic-versioning = ">=1.0.0,<2.0.0"
-hypothesis = "^6.88.4"
-requests = "^2.31.0"
-aiohttp = "^3.8.6"
+hypothesis = ">=6.88.4"
+requests = ">=2.31.0"
+aiohttp = ">=3.8.6"
 
 [tool.poetry.group.tiff.dependencies]
-tiffslide = "^2.2.0"
+tiffslide = ">=2.2.0"
 
 
 [tool.poetry.group.intake.dependencies]
-intake-xarray = "^0.7.0"
-intake-pattern-catalog = "^2023.3.0"
+intake-xarray = ">=0.7.0"
+intake-pattern-catalog = ">=2023.3.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]

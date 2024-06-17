@@ -263,7 +263,7 @@ class RegularGrid(NamedTuple):
         Yields
         ------
         Generator[slice, Any, None]
-            _description_
+            A generator of slices that can be used to index the grid into each partition.
         """
         size = self.size
         assert size is not None, "Cannot partition an infinite grid"
