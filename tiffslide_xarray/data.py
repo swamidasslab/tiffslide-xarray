@@ -217,6 +217,9 @@ class _ZarrTiffSlide(NamedTuple):
 def _zarr_tiffslide_opener(fname, **kwargs) -> _ZarrTiffSlide:
     import tiffslide
 
+    if "mode" in kwargs: # remove kwarg that sometimes is passed from xarray but crashes TiffSlide
+        kwargs.pop("mode")
+
     slide = tiffslide.TiffSlide(fname, **kwargs)
     zarr: xr.Dataset = xr.open_zarr(
         slide.zarr_group.store,
