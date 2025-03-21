@@ -26,7 +26,7 @@ classifiers = [
 python = ">=3.9,<4.0"
 xarray = ">=2023.9.0,<2024.10"
 xarray-datatree = ">=0.0.12"
-dm-tree = ">=0.1.8"
+dm-tree = "0.1.8"
 envsubst = ">=0.1.5"
 ruamel-yaml = ">=0.18.5"
 numpy = "<2"
