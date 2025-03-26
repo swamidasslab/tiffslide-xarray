@@ -1,15 +1,18 @@
 from __future__ import annotations
-
+from frozendict import frozendict
 
 import numpy as np
 import xarray as xr
-from datatree import DataTree
 from typing import Optional, Any, NamedTuple, Callable
 import os
 
 from xarray.backends import BackendArray, CachingFileManager, BackendEntrypoint
 from xarray.core import indexing
 
+try:
+    from datatree import DataTree
+except ModuleNotFoundError:
+    from xarray import DataTree
 
 
 def load_tiff_level(
@@ -20,27 +23,43 @@ def load_tiff_level(
 ) -> xr.Dataset:
     """Load specific level of a tiff slide into a xarray.Datset."""
 
+    frozen_storage_options = _freeze_dict(storage_options)
+
     file_manager = CachingFileManager(
         _zarr_tiffslide_opener,
         fname,
-        kwargs=dict(tifffile_options=tifffile_options, storage_options=storage_options),
+        kwargs=dict(tifffile_options=tifffile_options, storage_options=frozen_storage_options),
     )
 
     return _load_tiff_level(file_manager, fname, level)
+
+
+def _freeze_dict(d):
+    if isinstance(d, dict):
+        d = {k: _freeze_dict(v) for k, v in d.items()}
+        return frozendict(d)
+    return d
 
 
 def open_all_levels(
     fname: str,
     tifffile_options: Optional[dict[str, Any]] = None,
     storage_options: Optional[dict[str, Any]] = None,
-    level_to_group: Callable[[int], str] = lambda level: "/" if not level else f"level{level}",
+    level_to_group: Callable[[int], str] = lambda level: "/"
+    if not level
+    else f"level{level}",
 ) -> DataTree:
     """Load all levels of a tiff slide into a datatree.DataTree."""
+
+    storage_options = storage_options or {}
+    frozen_storage_options = _freeze_dict(storage_options)
 
     file_manager = CachingFileManager(
         _zarr_tiffslide_opener,
         fname,
-        kwargs=dict(tifffile_options=tifffile_options, storage_options=storage_options),
+        kwargs=dict(
+            tifffile_options=tifffile_options, storage_options=frozen_storage_options
+        ),
     )
 
     tree = {}
@@ -50,7 +69,7 @@ def open_all_levels(
     for level in range(n_levels):
         x = _load_tiff_level(file_manager, fname, level)
 
-        #tree["/" if level == 0 else f"level{level}"] = x
+        # tree["/" if level == 0 else f"level{level}"] = x
         tree[level_to_group(level)] = x
 
     tree = DataTree.from_dict(tree)
@@ -63,7 +82,7 @@ def _load_tiff_level(
     """Lazy load a particular level of a tiff slide. Add coordinates, attributes, and set encodings
     to reasonable defaults."""
     import tiffslide
-    
+
     with file_manager.acquire_context() as (zarr, slide):  # type: ignore
         f: tiffslide.TiffSlide = slide  # type: ignore
         n_levels = len(f.level_dimensions)  # type: ignore
@@ -111,7 +130,6 @@ def _load_tiff_level(
     x.encoding["preferred_chunks"] = {
         k[0].lower(): v for k, v in x.encoding["preferred_chunks"].items()
     }
-    
 
     for d in x.coords:
         if d in set("xyz"):
@@ -217,7 +235,9 @@ class _ZarrTiffSlide(NamedTuple):
 def _zarr_tiffslide_opener(fname, **kwargs) -> _ZarrTiffSlide:
     import tiffslide
 
-    if "mode" in kwargs: # remove kwarg that sometimes is passed from xarray but crashes TiffSlide
+    if (
+        "mode" in kwargs
+    ):  # remove kwarg that sometimes is passed from xarray but crashes TiffSlide
         kwargs.pop("mode")
 
     slide = tiffslide.TiffSlide(fname, **kwargs)
